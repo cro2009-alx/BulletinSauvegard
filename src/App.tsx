@@ -1,6 +1,6 @@
 import { Component, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from 'react'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { Archive, Bell, Building2, ChevronLeft, ChevronRight, CircleHelp, Download, Eye, EyeOff, FilePlus2, FileText, LayoutDashboard, LogOut, Menu, Printer, Search, ShieldCheck, UploadCloud, Users, X } from 'lucide-react'
+import { Archive, Bell, Building2, ChevronLeft, ChevronRight, CircleHelp, Download, Eye, EyeOff, FilePlus2, FileText, LayoutDashboard, LogOut, Menu, Printer, Search, ShieldCheck, Trash2, UploadCloud, Users, X } from 'lucide-react'
 import './App.css'
 
 const url = import.meta.env.VITE_SUPABASE_URL
@@ -700,6 +700,9 @@ function Archives() {
   const [openPeriod, setOpenPeriod] = useState<string | null>(null)
   const [selected, setSelected] = useState<Bulletin | null>(null)
   const [fileUrl, setFileUrl] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState<Bulletin | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   // Les écritures peuvent avoir été saisies avec "3ème", "3eme", "3 ème"
   // ou des espaces différents. On utilise une clé canonique pour qu'une
@@ -969,6 +972,36 @@ function Archives() {
     setFileUrl('')
   }
 
+  function requestDelete(target: Bulletin) {
+    setDeleteError('')
+    setConfirmDelete(target)
+  }
+
+  async function confirmAndDelete() {
+    if (!supabase || !confirmDelete || deleting) return
+    setDeleting(true)
+    setDeleteError('')
+    const target = confirmDelete
+    try {
+      // On retire d'abord la ligne (c'est elle qui donne accès au bulletin) : si cette étape
+      // réussit, le bulletin disparaît immédiatement des archives même si le fichier physique
+      // met plus de temps à être supprimé.
+      const { error: dbError } = await supabase.from('bulletins').delete().eq('id', target.id)
+      if (dbError) throw dbError
+      // Suppression du fichier réel dans le stockage. Best-effort : un échec ici ne doit pas
+      // faire réapparaître le bulletin, il resterait juste un fichier orphelin invisible.
+      await supabase.storage.from('bulletins').remove([target.file_path]).catch(() => {})
+
+      setBulletins(current => current.filter(item => item.id !== target.id))
+      if (selected?.id === target.id) closeViewer()
+      setConfirmDelete(null)
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : 'Suppression impossible. Réessayez.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return <>
     <style>{`
       .archive-gallery-toolbar { display:grid; gap:14px; margin-bottom:22px; }
@@ -993,9 +1026,19 @@ function Archives() {
       .archive-card-copy small { color:#7a8494; }
       .archive-card-arrow { color:#9aa3b1; flex:0 0 auto; }
       .archive-gallery-list { display:grid; gap:10px; }
-      .archive-result-card { display:flex; align-items:center; gap:12px; padding:14px 16px; }
+      .archive-result-card { display:flex; align-items:stretch; gap:0; padding:0; cursor:default; }
+      .archive-result-open { flex:1; min-width:0; display:flex; align-items:center; gap:12px; padding:14px 16px; border:0; background:none; text-align:left; cursor:pointer; font:inherit; color:inherit; }
       .archive-result-card .archive-card-copy strong { font-size:14px; }
-      .archive-result-card > svg:last-child { color:#2563eb; flex:0 0 auto; }
+      .archive-result-open > svg:last-child { color:#2563eb; flex:0 0 auto; }
+      .archive-delete-btn { flex:0 0 auto; width:44px; align-self:stretch; display:grid; place-items:center; border:0; border-left:1px solid #eef1f6; background:none; color:#9aa3b1; cursor:pointer; transition:background .15s ease, color .15s ease; }
+      .archive-delete-btn:hover { background:#fdeaea; color:#c62828; }
+      .archive-delete-btn:focus-visible { outline:2px solid #2563eb; outline-offset:-2px; }
+      .delete-confirm-body { display:grid; gap:6px; margin:6px 0 18px; }
+      .delete-confirm-body strong { color:#273249; }
+      .delete-confirm-body small { color:#7b8494; }
+      .delete-actions { display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; }
+      .delete-danger-button { display:inline-flex; align-items:center; gap:7px; border:0; border-radius:10px; background:#c62828; color:#fff; font:inherit; font-weight:700; padding:11px 18px; cursor:pointer; }
+      .delete-danger-button:disabled { opacity:.6; cursor:wait; }
       .archive-loading { display:flex; align-items:center; gap:9px; color:#64748b; font-size:13px; margin:10px 0 15px; }
       @media (max-width:760px) { .archive-gallery-filters, .archive-gallery-grid { grid-template-columns:1fr; } .archive-gallery-heading { align-items:flex-start; flex-direction:column; } }
     `}</style>
@@ -1171,14 +1214,19 @@ function Archives() {
         ) : (
           <div className="archive-gallery-list">
             {visibleBulletins.map(result => (
-              <button className="archive-result-card" key={result.id} onClick={() => void openBulletin(result)}>
-                <span className="archive-result-icon"><FileText size={21} /></span>
-                <span className="archive-card-copy">
-                  <strong>{result.original_filename}</strong>
-                  <small>{new Date(result.created_at).toLocaleDateString('fr-FR')}</small>
-                </span>
-                <Eye size={18} />
-              </button>
+              <div className="archive-result-card" key={result.id}>
+                <button className="archive-result-open" onClick={() => void openBulletin(result)}>
+                  <span className="archive-result-icon"><FileText size={21} /></span>
+                  <span className="archive-card-copy">
+                    <strong>{result.original_filename}</strong>
+                    <small>{new Date(result.created_at).toLocaleDateString('fr-FR')}</small>
+                  </span>
+                  <Eye size={18} />
+                </button>
+                <button type="button" className="archive-delete-btn" onClick={() => requestDelete(result)} aria-label={`Supprimer ${result.original_filename}`} title="Supprimer ce bulletin">
+                  <Trash2 size={17} />
+                </button>
+              </div>
             ))}
           </div>
         )}
@@ -1190,13 +1238,34 @@ function Archives() {
         result={selected}
         fileUrl={fileUrl}
         onClose={closeViewer}
+        onDelete={() => requestDelete(selected)}
       />
+    )}
+
+    {confirmDelete && (
+      <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Confirmer la suppression">
+        <div className="modal-card" style={{ width: 'min(440px, 94vw)', maxWidth: 440 }}>
+          <button className="modal-close" onClick={() => { if (!deleting) setConfirmDelete(null) }} aria-label="Fermer"><X size={18} /></button>
+          <p className="eyebrow">SUPPRESSION</p>
+          <h2>Supprimer ce bulletin ?</h2>
+          <div className="delete-confirm-body">
+            <strong>{confirmDelete.original_filename}</strong>
+            <small>{confirmDelete.classes?.name ?? 'Classe non renseignée'} · {confirmDelete.school_years?.label ?? 'Année non renseignée'} · {confirmDelete.periods?.name ?? 'Période non renseignée'}</small>
+            <small>Cette action est définitive. Le bulletin ne sera plus consultable dans vos archives.</small>
+          </div>
+          {deleteError && <div className="error-message">{deleteError}</div>}
+          <div className="delete-actions">
+            <button className="secondary" onClick={() => setConfirmDelete(null)} disabled={deleting}>Annuler</button>
+            <button className="delete-danger-button" onClick={() => void confirmAndDelete()} disabled={deleting}>{deleting ? 'Suppression…' : 'Supprimer définitivement'}</button>
+          </div>
+        </div>
+      </div>
     )}
   </>
 }
 
 
-function BulletinViewer({ result, fileUrl, onClose }: { result: any; fileUrl: string; onClose: () => void }) {
+function BulletinViewer({ result, fileUrl, onClose, onDelete }: { result: any; fileUrl: string; onClose: () => void; onDelete: () => void }) {
   async function downloadFile() {
     if (!fileUrl) return
     try {
@@ -1271,6 +1340,7 @@ function BulletinViewer({ result, fileUrl, onClose }: { result: any; fileUrl: st
         </div>
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 14, flexWrap: 'wrap' }}>
+          <button className="delete-danger-button" onClick={onDelete} style={{ marginRight: 'auto' }}><Trash2 size={16} /> Supprimer</button>
           <button className="secondary" onClick={onClose}>Fermer</button>
           <button className="secondary" onClick={printFile} disabled={!fileUrl}><Printer size={16} /> Imprimer</button>
           <button className="primary" onClick={() => void downloadFile()} disabled={!fileUrl}><Download size={16} /> Télécharger</button>
@@ -1598,7 +1668,7 @@ function SearchPage() {
             <span><strong>{result.original_filename}</strong><small>{result.classes.name} · {result.periods.name} · {result.school_years.label}</small></span>
             <small>{new Date(result.created_at).toLocaleDateString('fr-FR')}</small>
           </button>)}</div>}
-    {selected && <BulletinViewer result={selected} fileUrl={fileUrl} onClose={() => { setSelected(null); setFileUrl('') }} />}
+    {selected && <BulletinViewer result={selected} fileUrl={fileUrl} onClose={() => { setSelected(null); setFileUrl('') }} onDelete={() => {}} />}
     <style>{`
       .search-live-status { display:flex; align-items:center; gap:9px; margin:10px 0 14px; color:#64748b; font-size:13px; }
       .search-spinner { width:14px; height:14px; border:2px solid #dbe5f1; border-top-color:#2563eb; border-radius:50%; animation:searchSpin .65s linear infinite; }
