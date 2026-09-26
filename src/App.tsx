@@ -330,7 +330,7 @@ function AppContent() {
       </header>
       <div className="page-wrap">
         {view === 'dashboard' && <Dashboard stats={stats} go={setView} email={sessionEmail} />}
-        {view === 'archives' && <Archives stats={stats} />}
+        {view === 'archives' && <Archives />}
         {view === 'upload' && <Upload />}
         {view === 'search' && <SearchPage />}
         {view === 'subscription' && <Subscription />}
@@ -674,7 +674,7 @@ function useSubscription() { const [subscription, setSubscription] = useState<{ 
 function Dashboard({ stats, go, email }: { stats: typeof defaultStats; go: (v: View) => void; email: string }) { const subscription = useSubscription(); const [now] = useState(() => Date.now()); const expiry = subscription ? new Date(subscription.end_date).toLocaleDateString('fr-FR') : null; const active = subscription?.status === 'active' && new Date(subscription.end_date).getTime() > now; const confirmation = typeof window !== 'undefined' ? sessionStorage.getItem('mova_payment_confirmation') : null; useEffect(() => { if (confirmation) sessionStorage.removeItem('mova_payment_confirmation') }, [confirmation]); return <><PageTitle eyebrow="VUE D'ENSEMBLE" title={`Bonjour, ${email.split('@')[0]}.`} description="Que puis-je faire pour vous aujourd'hui ?" />{confirmation && <div className="success-message dashboard-confirmation">{confirmation}</div>}<section className="hero-strip"><div><span className="status-dot" /> {subscription ? `Abonnement ${active ? 'actif' : 'expiré'}` : 'Aucun abonnement actif'} {expiry && <><span className="separator" /> Expire le {expiry}</>}</div><button onClick={() => go('subscription')}>Voir mon abonnement <ChevronRight size={16} /></button></section><div className="stat-grid"><Stat label="Bulletins archivés" value={stats.bulletins || '—'} icon={FileText} tone="blue" /><Stat label="Élèves enregistrés" value={stats.students || '—'} icon={Users} tone="gold" /><Stat label="Années scolaires" value={stats.years || '—'} icon={Archive} tone="green" /></div><div className="section-heading"><h2>Que souhaitez-vous faire ?</h2><p className="muted">Les actions essentielles de votre espace.</p></div><div className="action-grid"><Action icon={FilePlus2} title="Ajouter des bulletins" text="Importez vos nouveaux documents" onClick={() => go('upload')} /><Action icon={Archive} title="Consulter les archives" text="Retrouvez un bulletin rapidement" onClick={() => go('archives')} /><Action icon={Search} title="Rechercher un bulletin" text="Par classe et année scolaire" onClick={() => go('search')} /></div><section className="notice"><div className="notice-icon"><Bell size={18} /></div><div><strong>{subscription ? (active ? 'Rappel important' : 'Abonnement expiré') : 'Aucun abonnement actif'}</strong><p>{subscription ? (active ? `Votre abonnement expire le ${expiry}. Pensez à le renouveler.` : 'Vos archives restent accessibles. Renouvelez pour continuer vos dépôts.') : 'Souscrivez une formule pour continuer à archiver vos bulletins.'}</p></div><button onClick={() => go('subscription')}>Voir les formules</button></section></> }
 function Stat({ label, value, icon: Icon, tone }: { label: string; value: string | number; icon: typeof FileText; tone: string }) { return <div className="stat-card"><span className={`stat-icon ${tone}`}><Icon size={19} /></span><span><small>{label}</small><strong>{value}</strong></span></div> }
 function Action({ icon: Icon, title, text, onClick }: { icon: typeof FileText; title: string; text: string; onClick: () => void }) { return <button className="action-card" onClick={onClick}><span className="action-icon"><Icon size={21} /></span><span><strong>{title}</strong><small>{text}</small></span><ChevronRight size={18} className="action-arrow" /></button> }
-function Archives({ stats }: { stats: typeof defaultStats }) {
+function Archives() {
   type Bulletin = {
     id: string
     establishment_id: string
@@ -1782,34 +1782,6 @@ function Subscription() {
   </>
 }
 
-
-function ArchiveGalleryStyles() {
-  return <style>{`
-    .archive-gallery { display: grid; gap: 16px; margin-top: 24px; }
-    .archive-level-card, .archive-year-card { width: 100%; border: 1px solid #e4e9f1; background: #fff; border-radius: 18px; display: grid; align-items: center; grid-template-columns: auto 1fr auto; gap: 14px; text-align: left; cursor: pointer; box-shadow: 0 10px 30px rgba(24,39,75,.06); transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
-    .archive-level-card { padding: 18px 20px; }
-    .archive-level-card:hover, .archive-year-card:hover { transform: translateY(-2px); box-shadow: 0 15px 35px rgba(24,39,75,.1); border-color: #cbd8ee; }
-    .archive-level-card strong, .archive-year-card strong { display: block; color: #14233a; font-size: 18px; }
-    .archive-level-card small, .archive-year-card small { display: block; margin-top: 4px; color: #7b8494; font-size: 12px; }
-    .archive-folder-icon, .archive-year-icon { display: grid; place-items: center; border-radius: 13px; background: #eef4ff; color: #1d4ed8; }
-    .archive-folder-icon { width: 48px; height: 48px; }
-    .archive-year-icon { width: 38px; height: 38px; }
-    .archive-chevron { transition: transform .2s ease; color: #8a95a7; }
-    .archive-chevron.rotated { transform: rotate(90deg); }
-    .archive-years { display: grid; gap: 10px; padding: 12px 0 0 30px; }
-    .archive-year-card { padding: 14px 16px; }
-    .archive-letters { display: grid; gap: 18px; padding: 14px 0 0 26px; }
-    .archive-letter-group { background: #f8fafc; border: 1px solid #e8edf4; border-radius: 16px; padding: 14px; }
-    .archive-letter-title { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-    .archive-letter-title > span { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: #eaf0ff; color: #1d4ed8; font-weight: 800; }
-    .archive-letter-title strong { color: #1e2b40; }
-    .archive-letter-title small { margin-left: auto; color: #7b8494; }
-    .class-format-recommendation { display: block; margin-top: 7px; color: #d72d2d; font-size: 12px; font-weight: 600; }
-    .file-remove { margin-left: auto; width: 32px; height: 32px; border: 0; border-radius: 9px; background: #f1f3f7; color: #667085; display: grid; place-items: center; cursor: pointer; flex: 0 0 auto; }
-    .file-remove:hover { background: #feecec; color: #c62828; }
-    @media (max-width: 760px) { .archive-years { padding-left: 10px; } .archive-letters { padding-left: 6px; } .archive-letter-title { flex-wrap: wrap; } .archive-letter-title small { margin-left: 0; width: 100%; } }
-  `}</style>
-}
 
 function ModernPricingStyles() {
   return <style>{`
