@@ -1,14 +1,15 @@
 import { Component, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from 'react'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { Archive, Bell, Building2, ChevronLeft, ChevronRight, CircleHelp, Download, Eye, EyeOff, FilePlus2, FileText, LayoutDashboard, LogOut, Menu, Printer, Search, ShieldCheck, Trash2, UploadCloud, Users, X } from 'lucide-react'
+import { Archive, Bell, Building2, ChevronLeft, ChevronRight, CircleHelp, Download, Eye, EyeOff, FilePlus2, FileText, FolderOpen, LayoutDashboard, LogOut, Menu, Printer, Search, ShieldCheck, Trash2, UploadCloud, Users, X } from 'lucide-react'
 import './App.css'
+import Releves from './Releves'
 
 const url = import.meta.env.VITE_SUPABASE_URL
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY
 const supabase: SupabaseClient | null = url && key ? createClient(url, key) : null
-type View = 'dashboard' | 'archives' | 'upload' | 'search' | 'subscription' | 'notifications' | 'establishment'
+type View = 'dashboard' | 'archives' | 'upload' | 'releves' | 'search' | 'subscription' | 'notifications' | 'establishment'
 const navItems: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
-  { id: 'dashboard', label: 'Accueil', icon: LayoutDashboard }, { id: 'upload', label: 'Ajouter des bulletins', icon: FilePlus2 }, { id: 'archives', label: 'Archives', icon: Archive }, { id: 'search', label: 'Recherche', icon: Search }, { id: 'subscription', label: 'Mon abonnement', icon: ShieldCheck }, { id: 'notifications', label: 'Notifications', icon: Bell }, { id: 'establishment', label: 'Mon établissement', icon: Building2 },
+  { id: 'dashboard', label: 'Accueil', icon: LayoutDashboard }, { id: 'upload', label: 'Ajouter des bulletins', icon: FilePlus2 }, { id: 'archives', label: 'Archives', icon: Archive }, { id: 'releves', label: 'Relevés', icon: FolderOpen }, { id: 'search', label: 'Recherche', icon: Search }, { id: 'subscription', label: 'Mon abonnement', icon: ShieldCheck }, { id: 'notifications', label: 'Notifications', icon: Bell }, { id: 'establishment', label: 'Mon établissement', icon: Building2 },
 ]
 const defaultStats = { bulletins: 0, students: 0, years: 0 }
 
@@ -332,6 +333,7 @@ function AppContent() {
         {view === 'dashboard' && <Dashboard stats={stats} go={setView} email={sessionEmail} />}
         {view === 'archives' && <Archives />}
         {view === 'upload' && <Upload />}
+        {view === 'releves' && <Releves supabase={supabase} />}
         {view === 'search' && <SearchPage />}
         {view === 'subscription' && <Subscription />}
         {view === 'notifications' && <Notifications />}
